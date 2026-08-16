@@ -36,6 +36,13 @@
             font-size: 1.8rem;
             color: #2c3e50;
             margin-bottom: 20px;
+            cursor: pointer;
+            user-select: none;
+            transition: opacity 0.2s;
+        }
+
+        h1:hover {
+            opacity: 0.8;
         }
 
         /* ==========================================
@@ -225,7 +232,8 @@
 <body>
 
     <div class="container">
-        <h1>軽量画像圧縮・変換ツール</h1>
+        <!-- タイトルクリックでページを再読み込み（リセット） -->
+        <h1 onclick="window.location.reload()" title="クリックして初期状態に戻す">軽量画像圧縮・変換ツール</h1>
 
         <!-- 画像ドロップ・選択エリア -->
         <div class="upload-area" id="uploadArea">
