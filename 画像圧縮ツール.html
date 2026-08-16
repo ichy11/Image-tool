@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像圧縮ツール (Image Compressor)</title>
+    <style>
+        /* ==========================================
+           基本スタイルと全体設計
+           ========================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #333333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        /* ==========================================
+           ドラッグ＆ドロップ用アップロードエリア
+           ========================================== */
+        .upload-area {
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            background-color: #f0f7ff;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            background-color: #e1f0ff;
+            border-color: #0056b3;
+        }
+
+        .upload-area p {
+            font-size: 1rem;
+            color: #555555;
+        }
+
+        .upload-area input[type="file"] {
+            display: none;
+        }
+
+        /* ==========================================
+           操作パネル（設定コントロール類）
+           ========================================== */
+        .controls {
+            margin-top: 25px;
+            display: none; /* 画像選択後に表示 */
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #eeeeee;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #444;
+        }
+
+        /* ラジオボタンエリアのスタイル */
+        .format-selector {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .format-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        .format-option input[type="radio"] {
+            cursor: pointer;
+            accent-color: #007bff;
+        }
+
+        /* スライダー調整エリア */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider-container input[type="range"] {
+            flex-grow: 1;
+            height: 6px;
+            border-radius: 3px;
+            accent-color: #007bff;
+            cursor: pointer;
+        }
+
+        .slider-container input[type="range"]:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .slider-value {
+            font-weight: bold;
+            width: 45px;
+            text-align: right;
+            color: #007bff;
+        }
+
+        /* 品質無効化時の注記 */
+        .note-text {
+            font-size: 0.8rem;
+            color: #e67e22;
+            margin-top: 4px;
+            display: none;
+        }
+
+        /* ==========================================
+           プレビュー＆比較エリア
+           ========================================== */
+        .preview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .preview-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .preview-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            background: #fff;
+        }
+
+        .preview-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .img-container {
+            width: 100%;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f1f1f1;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .file-info {
+            font-size: 0.9rem;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        /* ==========================================
+           ダウンロードボタン
+           ========================================== */
+        .btn-download {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-top: 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: background-color 0.2s;
+        }
+
+        .btn-download:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>軽量画像圧縮・変換ツール</h1>
+
+        <!-- 画像ドロップ・選択エリア -->
+        <div class="upload-area" id="uploadArea">
+            <p>ここに画像をドラッグ＆ドロップ<br>または <strong>クリックしてファイルを選択</strong></p>
+            <input type="file" id="fileInput" accept="image/jpeg, image/png, image/webp">
+        </div>
+
+        <!-- 圧縮設定およびプレビュー -->
+        <div class="controls" id="controls">
+
+            <!-- 1. 出力形式の選択 -->
+            <div class="control-group">
+                <label>出力フォーマット (Format)</label>
+                <div class="format-selector">
+                    <label class="format-option">
+                        <input type="radio" name="format" value="image/jpeg" checked> JPEG
+                    </label>
+                    <label class="format-option">
+                        <input type="radio" name="format" value="image/png"> PNG
+                    </label>
+                    <label class="format-option">
+                        <input type="radio" name="format" value="image/webp"> WebP
+                    </label>
+                </div>
+            </div>
+
+            <!-- 2. 品質スライダー -->
+            <div class="control-group">
+                <label for="quality">画質 (Quality)</label>
+                <div class="slider-container">
+                    <input type="range" id="quality" min="0.1" max="1.0" step="0.05" value="0.7">
+                    <span class="slider-value" id="qualityValue">70%</span>
+                </div>
+                <div class="note-text" id="pngNote">※ PNG形式は仕様上、品質による圧縮に対応していません。</div>
+            </div>
+
+            <!-- 3. 解像度スケールスライダー -->
+            <div class="control-group">
+                <label for="scale">解像度スケール (Size)</label>
+                <div class="slider-container">
+                    <input type="range" id="scale" min="0.1" max="1.0" step="0.05" value="1.0">
+                    <span class="slider-value" id="scaleValue">100%</span>
+                </div>
+            </div>
+
+            <!-- 画像比較表示 -->
+            <div class="preview-grid">
+                <!-- 元画像 -->
+                <div class="preview-card">
+                    <h3>元の画像</h3>
+                    <div class="img-container">
+                        <img id="originalPreview" alt="元画像プレビュー">
+                    </div>
+                    <div class="file-info">
+                        <div id="originalSize">サイズ: -</div>
+                        <div id="originalDimensions">解像度: -</div>
+                    </div>
+                </div>
+
+                <!-- 圧縮後の画像 -->
+                <div class="preview-card">
+                    <h3>圧縮・変換後</h3>
+                    <div class="img-container">
+                        <img id="compressedPreview" alt="圧縮画像プレビュー">
+                    </div>
+                    <div class="file-info">
+                        <div id="compressedSize">サイズ: -</div>
+                        <div id="compressedDimensions">解像度: -</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ダウンロードボタン -->
+            <a id="downloadBtn" class="btn-download" download="compressed_image.jpg">画像をダウンロード</a>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // DOM要素の取得
+        // ==========================================
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const controls = document.getElementById('controls');
+        
+        const formatInputs = document.querySelectorAll('input[name="format"]');
+        const qualityInput = document.getElementById('quality');
+        const qualityValue = document.getElementById('qualityValue');
+        const pngNote = document.getElementById('pngNote');
+        
+        const scaleInput = document.getElementById('scale');
+        const scaleValue = document.getElementById('scaleValue');
+
+        const originalPreview = document.getElementById('originalPreview');
+        const compressedPreview = document.getElementById('compressedPreview');
+        
+        const originalSize = document.getElementById('originalSize');
+        const originalDimensions = document.getElementById('originalDimensions');
+        const compressedSize = document.getElementById('compressedSize');
+        const compressedDimensions = document.getElementById('compressedDimensions');
+        
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // 現在選択されている元の画像オブジェクトとファイル情報を保持する変数
+        let currentImage = null;
+        let originalFileName = '';
+
+        // ==========================================
+        // イベントリスナー設定
+        // ==========================================
+
+        // クリックでファイル選択を開く
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // ファイルが選択された時
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // ドラッグ＆ドロップ処理
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // フォーマット切り替え時
+        formatInputs.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const selectedFormat = e.target.value;
+                
+                // PNGの場合は画質調整が効かないためコントロールを非活性化
+                if (selectedFormat === 'image/png') {
+                    qualityInput.disabled = true;
+                    pngNote.style.display = 'block';
+                } else {
+                    qualityInput.disabled = false;
+                    pngNote.style.display = 'none';
+                }
+
+                if (currentImage) {
+                    processImage();
+                }
+            });
+        });
+
+        // 画質スライダー変更時
+        qualityInput.addEventListener('input', (e) => {
+            const val = Math.round(e.target.value * 100);
+            qualityValue.textContent = `${val}%`;
+            if (currentImage) {
+                processImage();
+            }
+        });
+
+        // 解像度スケールスライダー変更時
+        scaleInput.addEventListener('input', (e) => {
+            const val = Math.round(e.target.value * 100);
+            scaleValue.textContent = `${val}%`;
+            if (currentImage) {
+                processImage();
+            }
+        });
+
+        // ==========================================
+        // メイン処理関数
+        // ==========================================
+
+        /**
+         * 選択されたファイルを読み込み処理する関数
+         * @param {File} file - 選択された画像ファイル
+         */
+        function handleFile(file) {
+            // 画像ファイル以外は処理しない
+            if (!file.type.match('image.*')) {
+                alert('画像ファイル (JPEG, PNG, WebP) を選択してください。');
+                return;
+            }
+
+            originalFileName = file.name;
+            originalSize.textContent = `サイズ: ${formatBytes(file.size)}`;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    originalPreview.src = e.target.result;
+                    
+                    // 元画像の解像度を表示
+                    originalDimensions.textContent = `解像度: ${img.width} × ${img.height} px`;
+
+                    // 操作パネルを表示
+                    controls.style.display = 'block';
+
+                    // 画像変換・圧縮を実行
+                    processImage();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * 選択されたフォーマット・画質・スケール設定で画像を変換・処理する関数
+         */
+        function processImage() {
+            if (!currentImage) return;
+
+            // 選択されているフォーマット値を取得 (image/jpeg, image/png, image/webp)
+            const selectedFormat = document.querySelector('input[name="format"]:checked').value;
+            const quality = parseFloat(qualityInput.value);
+            const scale = parseFloat(scaleInput.value);
+
+            // 1. スケールに応じた出力サイズを算出
+            const targetWidth = Math.round(currentImage.width * scale);
+            const targetHeight = Math.round(currentImage.height * scale);
+
+            // 2. Canvasの生成とサイズ設定
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+
+            // 3. 透過画像(PNG)からJPEGへ変換する際の背景白塗り対応
+            if (selectedFormat === 'image/jpeg') {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // 4. Canvasに拡大縮小して描画
+            ctx.drawImage(currentImage, 0, 0, targetWidth, targetHeight);
+
+            // 5. 指定のフォーマットと品質でDataURL化
+            const compressedDataUrl = canvas.toDataURL(selectedFormat, quality);
+
+            // プレビューと解像度情報の更新
+            compressedPreview.src = compressedDataUrl;
+            compressedDimensions.textContent = `解像度: ${targetWidth} × ${targetHeight} px`;
+
+            // 6. 拡張子の決定とダウンロード設定
+            let ext = 'jpg';
+            if (selectedFormat === 'image/png') ext = 'png';
+            if (selectedFormat === 'image/webp') ext = 'webp';
+
+            downloadBtn.href = compressedDataUrl;
+            const nameWithoutExt = originalFileName.substring(0, originalFileName.lastIndexOf('.')) || 'image';
+            downloadBtn.download = `${nameWithoutExt}_compressed.${ext}`;
+
+            // 7. DataURL（Base64）の長さを元におおよそのバイト数を算出して表示
+            const head = `data:${selectedFormat};base64,`;
+            const sizeInBytes = Math.round((compressedDataUrl.length - head.length) * 3 / 4);
+            compressedSize.textContent = `サイズ: ${formatBytes(sizeInBytes)}`;
+        }
+
+        /**
+         * バイト数をKB/MB形式にフォーマットするヘルパー関数
+         * @param {number} bytes - バイト数
+         * @returns {string} フォーマットされた文字列
+         */
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
