@@ -3,446 +3,371 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>画像圧縮ツール (Image Compressor)</title>
+    <title>マルチメディアコンバーター & 圧縮ツール</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- LameJS for Browser MP3 Encoding -->
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
     <style>
-        /* ==========================================
-           基本スタイルと全体設計
-           ========================================== */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #f8f9fa;
-            color: #333333;
-            line-height: 1.6;
-            padding: 20px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            padding: 30px;
-        }
-
-        h1 {
-            text-align: center;
-            font-size: 1.8rem;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            cursor: pointer;
-            user-select: none;
-            transition: opacity 0.2s;
-        }
-
-        h1:hover {
-            opacity: 0.8;
-        }
-
-        /* ==========================================
-           ドラッグ＆ドロップ用アップロードエリア
-           ========================================== */
-        .upload-area {
-            border: 2px dashed #007bff;
-            border-radius: 8px;
-            padding: 40px 20px;
-            text-align: center;
-            background-color: #f0f7ff;
-            cursor: pointer;
-            transition: background-color 0.2s, border-color 0.2s;
-        }
-
-        .upload-area:hover, .upload-area.dragover {
-            background-color: #e1f0ff;
-            border-color: #0056b3;
-        }
-
-        .upload-area p {
-            font-size: 1rem;
-            color: #555555;
-        }
-
-        .upload-area input[type="file"] {
-            display: none;
-        }
-
-        /* ==========================================
-           操作パネル（設定コントロール類）
-           ========================================== */
-        .controls {
-            margin-top: 25px;
-            display: none; /* 画像選択後に表示 */
-            background: #fafafa;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #eeeeee;
-        }
-
-        .control-group {
-            margin-bottom: 20px;
-        }
-
-        .control-group label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #444;
-        }
-
-        /* ラジオボタンエリアのスタイル */
-        .format-selector {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .format-option {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-            font-size: 0.95rem;
-        }
-
-        .format-option input[type="radio"] {
-            cursor: pointer;
-            accent-color: #007bff;
-        }
-
-        /* スライダー調整エリア */
-        .slider-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .slider-container input[type="range"] {
-            flex-grow: 1;
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
             height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
             border-radius: 3px;
-            accent-color: #007bff;
-            cursor: pointer;
-        }
-
-        .slider-container input[type="range"]:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .slider-value {
-            font-weight: bold;
-            width: 45px;
-            text-align: right;
-            color: #007bff;
-        }
-
-        /* 品質無効化時の注記 */
-        .note-text {
-            font-size: 0.8rem;
-            color: #e67e22;
-            margin-top: 4px;
-            display: none;
-        }
-
-        /* ==========================================
-           プレビュー＆比較エリア
-           ========================================== */
-        .preview-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        @media (max-width: 600px) {
-            .preview-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .preview-card {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-            background: #fff;
-        }
-
-        .preview-card h3 {
-            font-size: 1.1rem;
-            margin-bottom: 10px;
-            color: #555;
-        }
-
-        .img-container {
-            width: 100%;
-            height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #f1f1f1;
-            border-radius: 6px;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-
-        .img-container img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-
-        .file-info {
-            font-size: 0.9rem;
-            color: #666;
-            line-height: 1.5;
-        }
-
-        /* ==========================================
-           ダウンロードボタン
-           ========================================== */
-        .btn-download {
-            display: block;
-            width: 100%;
-            padding: 12px;
-            margin-top: 20px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
-            text-decoration: none;
-            transition: background-color 0.2s;
-        }
-
-        .btn-download:hover {
-            background-color: #218838;
         }
     </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
 
-    <div class="container">
-        <!-- タイトルクリックでページを再読み込み（リセット） -->
-        <h1 onclick="window.location.reload()" title="クリックして初期状態に戻す">軽量画像圧縮・変換ツール</h1>
+    <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 text-white text-center relative">
+            <h1 onclick="window.location.reload()" class="text-2xl sm:text-3xl font-extrabold tracking-tight cursor-pointer hover:opacity-90 transition-opacity flex items-center justify-center gap-3">
+                <i class="fa-solid fa-photo-film"></i>
+                マルチメディアコンバーター & 圧縮ツール
+            </h1>
+            <p class="text-blue-100 text-sm mt-2">画像圧縮・フォーマット変換 ＆ 動画圧縮・解像度調整・MP3音声抽出</p>
+        </header>
 
-        <!-- 画像ドロップ・選択エリア -->
-        <div class="upload-area" id="uploadArea">
-            <p>ここに画像をドラッグ＆ドロップ<br>または <strong>クリックしてファイルを選択</strong></p>
-            <input type="file" id="fileInput" accept="image/jpeg, image/png, image/webp">
-        </div>
+        <main class="p-6 sm:p-8">
+            <!-- Toast Alert Box -->
+            <div id="toast" class="hidden mb-6 p-4 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-between">
+                <span id="toastMessage"></span>
+                <button onclick="dismissToast()" class="text-lg opacity-70 hover:opacity-100">&times;</button>
+            </div>
 
-        <!-- 圧縮設定およびプレビュー -->
-        <div class="controls" id="controls">
-
-            <!-- 1. 出力形式の選択 -->
-            <div class="control-group">
-                <label>出力フォーマット (Format)</label>
-                <div class="format-selector">
-                    <label class="format-option">
-                        <input type="radio" name="format" value="image/jpeg" checked> JPEG
-                    </label>
-                    <label class="format-option">
-                        <input type="radio" name="format" value="image/png"> PNG
-                    </label>
-                    <label class="format-option">
-                        <input type="radio" name="format" value="image/webp"> WebP
-                    </label>
+            <!-- Dropzone -->
+            <div id="uploadArea" class="border-2 border-dashed border-blue-400 hover:border-blue-600 rounded-2xl p-8 sm:p-12 text-center bg-blue-50/50 hover:bg-blue-50 cursor-pointer transition-all duration-200 group">
+                <input type="file" id="fileInput" accept="image/*,video/*" class="hidden">
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                    <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-700 mb-1">ここに画像または動画をドラッグ＆ドロップ</h3>
+                <p class="text-sm text-slate-500 mb-3">または <span class="text-blue-600 font-medium underline">ファイルを選択</span></p>
+                <div class="inline-flex items-center gap-2 text-xs text-slate-400 bg-white py-1 px-3 rounded-full border border-slate-200">
+                    <span><i class="fa-regular fa-image text-blue-500"></i> JPG, PNG, WebP</span>
+                    <span>•</span>
+                    <span><i class="fa-solid fa-video text-purple-500"></i> MP4, WebM, MOV 等</span>
                 </div>
             </div>
 
-            <!-- 2. 品質スライダー -->
-            <div class="control-group">
-                <label for="quality">画質 (Quality)</label>
-                <div class="slider-container">
-                    <input type="range" id="quality" min="0.1" max="1.0" step="0.05" value="0.7">
-                    <span class="slider-value" id="qualityValue">70%</span>
+            <!-- Controls Container for Image -->
+            <div id="imageControls" class="hidden mt-8 space-y-6">
+                <div class="flex items-center gap-2 pb-3 border-b border-slate-200">
+                    <i class="fa-solid fa-sliders text-blue-600"></i>
+                    <h2 class="text-lg font-bold text-slate-800">画像圧縮・変換設定</h2>
                 </div>
-                <div class="note-text" id="pngNote">※ PNG形式は仕様上、品質による圧縮に対応していません。</div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-5 rounded-xl border border-slate-200/80">
+                    <!-- Format -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">出力フォーマット</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                <input type="radio" name="imgFormat" value="image/jpeg" checked class="accent-blue-600"> JPEG
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                <input type="radio" name="imgFormat" value="image/png" class="accent-blue-600"> PNG
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                <input type="radio" name="imgFormat" value="image/webp" class="accent-blue-600"> WebP
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Quality -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="imgQuality" class="text-sm font-semibold text-slate-700">画質 (Quality)</label>
+                            <span id="imgQualityValue" class="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded">80%</span>
+                        </div>
+                        <input type="range" id="imgQuality" min="0.1" max="1.0" step="0.05" value="0.8" class="w-full accent-blue-600 cursor-pointer">
+                        <p id="pngNote" class="text-xs text-amber-600 mt-2 hidden">※ PNG形式は仕様上、画質スライダーの調整に対応していません。</p>
+                    </div>
+
+                    <!-- Scale -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="imgScale" class="text-sm font-semibold text-slate-700">解像度スケール</label>
+                            <span id="imgScaleValue" class="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded">100%</span>
+                        </div>
+                        <input type="range" id="imgScale" min="0.1" max="1.0" step="0.05" value="1.0" class="w-full accent-blue-600 cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Image Preview Comparison -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-sm">
+                        <h4 class="text-sm font-semibold text-slate-500 mb-3">元の画像</h4>
+                        <div class="w-full h-48 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden mb-3 border border-slate-200">
+                            <img id="imgOriginalPreview" class="max-w-full max-h-full object-contain" alt="Original Preview">
+                        </div>
+                        <div class="text-xs text-slate-600 space-y-1">
+                            <div id="imgOriginalSize">サイズ: -</div>
+                            <div id="imgOriginalDimensions">解像度: -</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-sm">
+                        <h4 class="text-sm font-semibold text-slate-500 mb-3">圧縮・変換後</h4>
+                        <div class="w-full h-48 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden mb-3 border border-slate-200">
+                            <img id="imgCompressedPreview" class="max-w-full max-h-full object-contain" alt="Compressed Preview">
+                        </div>
+                        <div class="text-xs text-slate-600 space-y-1">
+                            <div id="imgCompressedSize" class="font-bold text-emerald-600">サイズ: -</div>
+                            <div id="imgCompressedDimensions">解像度: -</div>
+                        </div>
+                    </div>
+                </div>
+
+                <a id="imgDownloadBtn" download="compressed_image.jpg" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all text-center block">
+                    <i class="fa-solid fa-download mr-2"></i>圧縮された画像をダウンロード
+                </a>
             </div>
 
-            <!-- 3. 解像度スケールスライダー -->
-            <div class="control-group">
-                <label for="scale">解像度スケール (Size)</label>
-                <div class="slider-container">
-                    <input type="range" id="scale" min="0.1" max="1.0" step="0.05" value="1.0">
-                    <span class="slider-value" id="scaleValue">100%</span>
+            <!-- Controls Container for Video -->
+            <div id="videoControls" class="hidden mt-8 space-y-6">
+                <!-- Mode Selector Tabs -->
+                <div class="flex border-b border-slate-200">
+                    <button id="tabVideoCompress" onclick="switchVideoTab('compress')" class="py-2.5 px-5 font-semibold text-sm border-b-2 border-purple-600 text-purple-600 flex items-center gap-2">
+                        <i class="fa-solid fa-file-video"></i> 動画圧縮・サイズ変更
+                    </button>
+                    <button id="tabAudioExtract" onclick="switchVideoTab('audio')" class="py-2.5 px-5 font-semibold text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2">
+                        <i class="fa-solid fa-file-audio"></i> 音声抽出 (MP3 / WAV)
+                    </button>
+                </div>
+
+                <!-- Sub Panel: Video Compression -->
+                <div id="panelVideoCompress" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-5 rounded-xl border border-slate-200/80">
+                        <!-- Resolution Scale -->
+                        <div>
+                            <label for="videoScale" class="block text-sm font-semibold text-slate-700 mb-2">解像度スケール</label>
+                            <select id="videoScale" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                                <option value="1.0">100% (オリジナルのサイズ)</option>
+                                <option value="0.75">75% 解像度</option>
+                                <option value="0.5" selected>50% 解像度 (推奨)</option>
+                                <option value="0.25">25% 解像度 (大幅軽量化)</option>
+                            </select>
+                        </div>
+
+                        <!-- Quality / Bitrate Preset -->
+                        <div>
+                            <label for="videoQuality" class="block text-sm font-semibold text-slate-700 mb-2">画質 / ビットレート</label>
+                            <select id="videoQuality" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                                <option value="4000000">高画質 (約 4.0 Mbps)</option>
+                                <option value="2000000" selected>標準画質 (約 2.0 Mbps)</option>
+                                <option value="1000000">低画質・高圧縮 (約 1.0 Mbps)</option>
+                                <option value="500000">超高圧縮 (約 0.5 Mbps)</option>
+                            </select>
+                        </div>
+
+                        <!-- Video Output Format -->
+                        <div>
+                            <label for="videoFormat" class="block text-sm font-semibold text-slate-700 mb-2">出力フォーマット</label>
+                            <select id="videoFormat" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                                <option value="video/webm">WebM (高圧縮・推奨)</option>
+                                <option value="video/mp4">MP4 (H.264 / AAC)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub Panel: Audio Extraction -->
+                <div id="panelAudioExtract" class="hidden space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-5 rounded-xl border border-slate-200/80">
+                        <!-- Audio Format -->
+                        <div>
+                            <label for="audioFormat" class="block text-sm font-semibold text-slate-700 mb-2">音声出力フォーマット</label>
+                            <select id="audioFormat" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                                <option value="mp3" selected>MP3 (標準音声ファイル)</option>
+                                <option value="wav">WAV (非圧縮・高音質)</option>
+                                <option value="aac">AAC / M4A (高効率音声)</option>
+                            </select>
+                        </div>
+
+                        <!-- Audio Bitrate -->
+                        <div id="audioBitrateWrapper">
+                            <label for="audioBitrate" class="block text-sm font-semibold text-slate-700 mb-2">ビットレート (音質)</label>
+                            <select id="audioBitrate" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                                <option value="128">128 kbps (標準)</option>
+                                <option value="192" selected>192 kbps (高音質)</option>
+                                <option value="320">320 kbps (最高音質)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video Source Info & Player Preview -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <h4 class="text-sm font-semibold text-slate-600 mb-2 flex items-center justify-between">
+                        <span>元動画プレビュー</span>
+                        <span id="videoOriginalMeta" class="text-xs font-normal text-slate-500">サイズ: - | 00:00</span>
+                    </h4>
+                    <div class="w-full max-h-64 bg-black rounded-lg overflow-hidden flex items-center justify-center">
+                        <video id="videoPlayer" controls class="max-h-64 w-auto mx-auto"></video>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div id="processProgressContainer" class="hidden space-y-2">
+                    <div class="flex justify-between text-xs font-semibold text-slate-600">
+                        <span id="progressStatus">処理中...</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
+                        <div id="progressBar" class="bg-gradient-to-r from-purple-500 to-indigo-600 h-full w-0 transition-all duration-150"></div>
+                    </div>
+                </div>
+
+                <!-- Start Processing Button -->
+                <button id="startVideoProcessBtn" onclick="processVideoOrAudio()" class="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-bolt"></i> <span id="processBtnText">処理を開始する</span>
+                </button>
+
+                <!-- Processed Result Container -->
+                <div id="videoResultContainer" class="hidden bg-emerald-50 p-5 rounded-xl border border-emerald-200 text-center space-y-4">
+                    <div class="flex items-center justify-center gap-2 text-emerald-700 font-bold text-lg">
+                        <i class="fa-solid fa-circle-check"></i> 処理が完了しました！
+                    </div>
+                    <div class="text-xs text-slate-600" id="videoResultMeta">
+                        ファイルサイズ: 0 MB
+                    </div>
+                    <!-- Audio Output Player if Audio mode -->
+                    <div id="audioOutputWrapper" class="hidden">
+                        <audio id="audioPlayer" controls class="w-full mt-2"></audio>
+                    </div>
+                    <a id="videoDownloadBtn" download="output.mp4" class="inline-flex items-center justify-center gap-2 w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow transition-all">
+                        <i class="fa-solid fa-download"></i> 変換したファイルをダウンロード
+                    </a>
                 </div>
             </div>
-
-            <!-- 画像比較表示 -->
-            <div class="preview-grid">
-                <!-- 元画像 -->
-                <div class="preview-card">
-                    <h3>元の画像</h3>
-                    <div class="img-container">
-                        <img id="originalPreview" alt="元画像プレビュー">
-                    </div>
-                    <div class="file-info">
-                        <div id="originalSize">サイズ: -</div>
-                        <div id="originalDimensions">解像度: -</div>
-                    </div>
-                </div>
-
-                <!-- 圧縮後の画像 -->
-                <div class="preview-card">
-                    <h3>圧縮・変換後</h3>
-                    <div class="img-container">
-                        <img id="compressedPreview" alt="圧縮画像プレビュー">
-                    </div>
-                    <div class="file-info">
-                        <div id="compressedSize">サイズ: -</div>
-                        <div id="compressedDimensions">解像度: -</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ダウンロードボタン -->
-            <a id="downloadBtn" class="btn-download" download="compressed_image.jpg">画像をダウンロード</a>
-        </div>
+        </main>
     </div>
 
     <script>
-        // ==========================================
-        // DOM要素の取得
-        // ==========================================
+        // Global variables & DOM references
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
-        const controls = document.getElementById('controls');
-        
-        const formatInputs = document.querySelectorAll('input[name="format"]');
-        const qualityInput = document.getElementById('quality');
-        const qualityValue = document.getElementById('qualityValue');
+
+        // Image DOM
+        const imageControls = document.getElementById('imageControls');
+        const imgFormatInputs = document.querySelectorAll('input[name="imgFormat"]');
+        const imgQuality = document.getElementById('imgQuality');
+        const imgQualityValue = document.getElementById('imgQualityValue');
         const pngNote = document.getElementById('pngNote');
-        
-        const scaleInput = document.getElementById('scale');
-        const scaleValue = document.getElementById('scaleValue');
+        const imgScale = document.getElementById('imgScale');
+        const imgScaleValue = document.getElementById('imgScaleValue');
+        const imgOriginalPreview = document.getElementById('imgOriginalPreview');
+        const imgCompressedPreview = document.getElementById('imgCompressedPreview');
+        const imgOriginalSize = document.getElementById('imgOriginalSize');
+        const imgOriginalDimensions = document.getElementById('imgOriginalDimensions');
+        const imgCompressedSize = document.getElementById('imgCompressedSize');
+        const imgCompressedDimensions = document.getElementById('imgCompressedDimensions');
+        const imgDownloadBtn = document.getElementById('imgDownloadBtn');
 
-        const originalPreview = document.getElementById('originalPreview');
-        const compressedPreview = document.getElementById('compressedPreview');
-        
-        const originalSize = document.getElementById('originalSize');
-        const originalDimensions = document.getElementById('originalDimensions');
-        const compressedSize = document.getElementById('compressedSize');
-        const compressedDimensions = document.getElementById('compressedDimensions');
-        
-        const downloadBtn = document.getElementById('downloadBtn');
+        // Video DOM
+        const videoControls = document.getElementById('videoControls');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const videoOriginalMeta = document.getElementById('videoOriginalMeta');
+        const processProgressContainer = document.getElementById('processProgressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressStatus = document.getElementById('progressStatus');
+        const progressPercent = document.getElementById('progressPercent');
+        const startVideoProcessBtn = document.getElementById('startVideoProcessBtn');
+        const processBtnText = document.getElementById('processBtnText');
+        const videoResultContainer = document.getElementById('videoResultContainer');
+        const videoResultMeta = document.getElementById('videoResultMeta');
+        const videoDownloadBtn = document.getElementById('videoDownloadBtn');
+        const audioOutputWrapper = document.getElementById('audioOutputWrapper');
+        const audioPlayer = document.getElementById('audioPlayer');
 
-        // 現在選択されている元の画像オブジェクトとファイル情報を保持する変数
-        let currentImage = null;
-        let originalFileName = '';
+        let currentFile = null;
+        let currentFileType = ''; // 'image' or 'video'
+        let currentImageObj = null;
+        let currentVideoTab = 'compress'; // 'compress' or 'audio'
 
-        // ==========================================
-        // イベントリスナー設定
-        // ==========================================
+        // Toast Helper
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.textContent = msg;
+            toast.className = 'mb-6 p-4 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-between ';
+            if (type === 'error') {
+                toast.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-200');
+            } else if (type === 'success') {
+                toast.classList.add('bg-emerald-100', 'text-emerald-800', 'border', 'border-emerald-200');
+            } else {
+                toast.classList.add('bg-blue-100', 'text-blue-800', 'border', 'border-blue-200');
+            }
+            toast.classList.remove('hidden');
+        }
 
-        // クリックでファイル選択を開く
+        function dismissToast() {
+            document.getElementById('toast').classList.add('hidden');
+        }
+
+        // Event listeners for Drag & Drop
         uploadArea.addEventListener('click', () => fileInput.click());
 
-        // ファイルが選択された時
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
         });
 
-        // ドラッグ＆ドロップ処理
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.classList.add('dragover');
+            uploadArea.classList.add('bg-blue-100/70', 'border-blue-600');
         });
 
         uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
+            uploadArea.classList.remove('bg-blue-100/70', 'border-blue-600');
         });
 
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
-                handleFile(e.dataTransfer.files[0]);
-            }
+            uploadArea.classList.remove('bg-blue-100/70', 'border-blue-600');
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
         });
 
-        // フォーマット切り替え時
-        formatInputs.forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                const selectedFormat = e.target.value;
-                
-                // PNGの場合は画質調整が効かないためコントロールを非活性化
-                if (selectedFormat === 'image/png') {
-                    qualityInput.disabled = true;
-                    pngNote.style.display = 'block';
-                } else {
-                    qualityInput.disabled = false;
-                    pngNote.style.display = 'none';
-                }
-
-                if (currentImage) {
-                    processImage();
-                }
-            });
-        });
-
-        // 画質スライダー変更時
-        qualityInput.addEventListener('input', (e) => {
-            const val = Math.round(e.target.value * 100);
-            qualityValue.textContent = `${val}%`;
-            if (currentImage) {
-                processImage();
-            }
-        });
-
-        // 解像度スケールスライダー変更時
-        scaleInput.addEventListener('input', (e) => {
-            const val = Math.round(e.target.value * 100);
-            scaleValue.textContent = `${val}%`;
-            if (currentImage) {
-                processImage();
-            }
-        });
-
-        // ==========================================
-        // メイン処理関数
-        // ==========================================
-
-        /**
-         * 選択されたファイルを読み込み処理する関数
-         * @param {File} file - 選択された画像ファイル
-         */
         function handleFile(file) {
-            // 画像ファイル以外は処理しない
-            if (!file.type.match('image.*')) {
-                alert('画像ファイル (JPEG, PNG, WebP) を選択してください。');
-                return;
+            dismissToast();
+            currentFile = file;
+
+            if (file.type.startsWith('image/')) {
+                currentFileType = 'image';
+                imageControls.classList.remove('hidden');
+                videoControls.classList.add('hidden');
+                initImageProcess(file);
+            } else if (file.type.startsWith('video/')) {
+                currentFileType = 'video';
+                videoControls.classList.remove('hidden');
+                imageControls.classList.add('hidden');
+                initVideoProcess(file);
+            } else {
+                showToast('サポートされていないファイル形式です。画像または動画ファイルを選択してください。', 'error');
             }
+        }
 
-            originalFileName = file.name;
-            originalSize.textContent = `サイズ: ${formatBytes(file.size)}`;
-
+        /* ==========================================================================
+           IMAGE PROCESSING
+           ========================================================================== */
+        function initImageProcess(file) {
+            imgOriginalSize.textContent = `サイズ: ${formatBytes(file.size)}`;
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    currentImage = img;
-                    originalPreview.src = e.target.result;
-                    
-                    // 元画像の解像度を表示
-                    originalDimensions.textContent = `解像度: ${img.width} × ${img.height} px`;
-
-                    // 操作パネルを表示
-                    controls.style.display = 'block';
-
-                    // 画像変換・圧縮を実行
+                    currentImageObj = img;
+                    imgOriginalPreview.src = e.target.result;
+                    imgOriginalDimensions.textContent = `解像度: ${img.width} × ${img.height} px`;
                     processImage();
                 };
                 img.src = e.target.result;
@@ -450,69 +375,387 @@
             reader.readAsDataURL(file);
         }
 
-        /**
-         * 選択されたフォーマット・画質・スケール設定で画像を変換・処理する関数
-         */
+        imgFormatInputs.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                pngNote.style.display = (e.target.value === 'image/png') ? 'block' : 'none';
+                imgQuality.disabled = (e.target.value === 'image/png');
+                processImage();
+            });
+        });
+
+        imgQuality.addEventListener('input', (e) => {
+            imgQualityValue.textContent = `${Math.round(e.target.value * 100)}%`;
+            processImage();
+        });
+
+        imgScale.addEventListener('input', (e) => {
+            imgScaleValue.textContent = `${Math.round(e.target.value * 100)}%`;
+            processImage();
+        });
+
         function processImage() {
-            if (!currentImage) return;
+            if (!currentImageObj) return;
 
-            // 選択されているフォーマット値を取得 (image/jpeg, image/png, image/webp)
-            const selectedFormat = document.querySelector('input[name="format"]:checked').value;
-            const quality = parseFloat(qualityInput.value);
-            const scale = parseFloat(scaleInput.value);
+            const selectedFormat = document.querySelector('input[name="imgFormat"]:checked').value;
+            const quality = parseFloat(imgQuality.value);
+            const scale = parseFloat(imgScale.value);
 
-            // 1. スケールに応じた出力サイズを算出
-            const targetWidth = Math.round(currentImage.width * scale);
-            const targetHeight = Math.round(currentImage.height * scale);
+            const targetWidth = Math.round(currentImageObj.width * scale);
+            const targetHeight = Math.round(currentImageObj.height * scale);
 
-            // 2. Canvasの生成とサイズ設定
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = targetWidth;
             canvas.height = targetHeight;
 
-            // 3. 透過画像(PNG)からJPEGへ変換する際の背景白塗り対応
             if (selectedFormat === 'image/jpeg') {
                 ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillRect(0, 0, targetWidth, targetHeight);
             }
 
-            // 4. Canvasに拡大縮小して描画
-            ctx.drawImage(currentImage, 0, 0, targetWidth, targetHeight);
+            ctx.drawImage(currentImageObj, 0, 0, targetWidth, targetHeight);
 
-            // 5. 指定のフォーマットと品質でDataURL化
             const compressedDataUrl = canvas.toDataURL(selectedFormat, quality);
+            imgCompressedPreview.src = compressedDataUrl;
+            imgCompressedDimensions.textContent = `解像度: ${targetWidth} × ${targetHeight} px`;
 
-            // プレビューと解像度情報の更新
-            compressedPreview.src = compressedDataUrl;
-            compressedDimensions.textContent = `解像度: ${targetWidth} × ${targetHeight} px`;
-
-            // 6. 拡張子の決定とダウンロード設定
             let ext = 'jpg';
             if (selectedFormat === 'image/png') ext = 'png';
             if (selectedFormat === 'image/webp') ext = 'webp';
 
-            downloadBtn.href = compressedDataUrl;
-            const nameWithoutExt = originalFileName.substring(0, originalFileName.lastIndexOf('.')) || 'image';
-            downloadBtn.download = `${nameWithoutExt}_compressed.${ext}`;
+            imgDownloadBtn.href = compressedDataUrl;
+            const name = currentFile.name.substring(0, currentFile.name.lastIndexOf('.')) || 'image';
+            imgDownloadBtn.download = `${name}_compressed.${ext}`;
 
-            // 7. DataURL（Base64）の長さを元におおよそのバイト数を算出して表示
             const head = `data:${selectedFormat};base64,`;
             const sizeInBytes = Math.round((compressedDataUrl.length - head.length) * 3 / 4);
-            compressedSize.textContent = `サイズ: ${formatBytes(sizeInBytes)}`;
+            imgCompressedSize.textContent = `サイズ: ${formatBytes(sizeInBytes)}`;
         }
 
-        /**
-         * バイト数をKB/MB形式にフォーマットするヘルパー関数
-         * @param {number} bytes - バイト数
-         * @returns {string} フォーマットされた文字列
-         */
+        /* ==========================================================================
+           VIDEO & AUDIO PROCESSING
+           ========================================================================== */
+        function switchVideoTab(tab) {
+            currentVideoTab = tab;
+            const tabCompress = document.getElementById('tabVideoCompress');
+            const tabAudio = document.getElementById('tabAudioExtract');
+            const panelCompress = document.getElementById('panelVideoCompress');
+            const panelAudio = document.getElementById('panelAudioExtract');
+
+            if (tab === 'compress') {
+                tabCompress.className = "py-2.5 px-5 font-semibold text-sm border-b-2 border-purple-600 text-purple-600 flex items-center gap-2";
+                tabAudio.className = "py-2.5 px-5 font-semibold text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2";
+                panelCompress.classList.remove('hidden');
+                panelAudio.classList.add('hidden');
+                processBtnText.textContent = "動画の圧縮・変換を開始";
+            } else {
+                tabAudio.className = "py-2.5 px-5 font-semibold text-sm border-b-2 border-purple-600 text-purple-600 flex items-center gap-2";
+                tabCompress.className = "py-2.5 px-5 font-semibold text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2";
+                panelAudio.classList.remove('hidden');
+                panelCompress.classList.add('hidden');
+                processBtnText.textContent = "音声の抽出・変換を開始";
+            }
+            videoResultContainer.classList.add('hidden');
+        }
+
+        function initVideoProcess(file) {
+            videoResultContainer.classList.add('hidden');
+            processProgressContainer.classList.add('hidden');
+            const url = URL.createObjectURL(file);
+            videoPlayer.src = url;
+
+            videoPlayer.onloadedmetadata = () => {
+                const duration = formatTime(videoPlayer.duration);
+                videoOriginalMeta.textContent = `サイズ: ${formatBytes(file.size)} | 解像度: ${videoPlayer.videoWidth}×${videoPlayer.videoHeight} | 時間: ${duration}`;
+            };
+        }
+
+        async function processVideoOrAudio() {
+            if (!currentFile) return;
+
+            startVideoProcessBtn.disabled = true;
+            startVideoProcessBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            processProgressContainer.classList.remove('hidden');
+            videoResultContainer.classList.add('hidden');
+            updateProgress(0, "処理準備中...");
+
+            try {
+                if (currentVideoTab === 'compress') {
+                    await compressVideo();
+                } else {
+                    await extractAudio();
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("処理中にエラーが発生しました: " + err.message, "error");
+            } finally {
+                startVideoProcessBtn.disabled = false;
+                startVideoProcessBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // Video Compression Function via Canvas & MediaRecorder
+        function compressVideo() {
+            return new Promise((resolve, reject) => {
+                const scale = parseFloat(document.getElementById('videoScale').value);
+                const bps = parseInt(document.getElementById('videoQuality').value, 10);
+                const format = document.getElementById('videoFormat').value;
+
+                const targetWidth = Math.floor((videoPlayer.videoWidth * scale) / 2) * 2; // Keep even numbers
+                const targetHeight = Math.floor((videoPlayer.videoHeight * scale) / 2) * 2;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                const ctx = canvas.getContext('2d');
+
+                // MediaStream from Canvas and Audio
+                const canvasStream = canvas.captureStream(30);
+                
+                // Web Audio API setup for capturing sound
+                let audioCtx, sourceNode, destNode;
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    sourceNode = audioCtx.createMediaElementSource(videoPlayer);
+                    destNode = audioCtx.createMediaStreamDestination();
+                    sourceNode.connect(destNode);
+                    sourceNode.connect(audioCtx.destination); // Optional playback
+
+                    const audioTracks = destNode.stream.getAudioTracks();
+                    if (audioTracks.length > 0) {
+                        canvasStream.addTrack(audioTracks[0]);
+                    }
+                } catch(e) {
+                    console.log("Audio capture fallback", e);
+                }
+
+                let options = { mimeType: format, videoBitsPerSecond: bps };
+                if (!MediaRecorder.isTypeSupported(format)) {
+                    options = { mimeType: 'video/webm', videoBitsPerSecond: bps };
+                }
+
+                let mediaRecorder;
+                try {
+                    mediaRecorder = new MediaRecorder(canvasStream, options);
+                } catch (e) {
+                    return reject(new Error("ブラウザが選択した動画コーデックをサポートしていません。"));
+                }
+
+                const chunks = [];
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) chunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: options.mimeType });
+                    const outputUrl = URL.createObjectURL(blob);
+
+                    let ext = options.mimeType.includes('mp4') ? 'mp4' : 'webm';
+                    videoDownloadBtn.href = outputUrl;
+                    const baseName = currentFile.name.substring(0, currentFile.name.lastIndexOf('.')) || 'video';
+                    videoDownloadBtn.download = `${baseName}_compressed.${ext}`;
+
+                    videoResultMeta.textContent = `出力サイズ: ${formatBytes(blob.size)} | 解像度: ${targetWidth}×${targetHeight}`;
+                    audioOutputWrapper.classList.add('hidden');
+                    videoResultContainer.classList.remove('hidden');
+
+                    showToast("動画の圧縮・変換が成功しました！", "success");
+                    resolve();
+                };
+
+                // Play & Render Loop
+                videoPlayer.currentTime = 0;
+                videoPlayer.muted = false;
+
+                let animationFrameId;
+                const renderFrame = () => {
+                    if (!videoPlayer.paused && !videoPlayer.ended) {
+                        ctx.drawImage(videoPlayer, 0, 0, targetWidth, targetHeight);
+                        const progress = (videoPlayer.currentTime / videoPlayer.duration) * 100;
+                        updateProgress(progress, `エンコード中 (${Math.round(progress)}%)`);
+                        animationFrameId = requestAnimationFrame(renderFrame);
+                    }
+                };
+
+                videoPlayer.onended = () => {
+                    cancelAnimationFrame(animationFrameId);
+                    mediaRecorder.stop();
+                    if (audioCtx) audioCtx.close();
+                };
+
+                videoPlayer.play().then(() => {
+                    mediaRecorder.start();
+                    renderFrame();
+                }).catch(err => {
+                    reject(new Error("動画の再生を開始できませんでした。"));
+                });
+            });
+        }
+
+        async function extractAudio() {
+            updateProgress(10, "音声トラックを読み込んでいます...");
+            const targetFormat = document.getElementById('audioFormat').value;
+            const bitrate = parseInt(document.getElementById('audioBitrate').value, 10);
+
+            // Read file into ArrayBuffer
+            const fileBuffer = await currentFile.arrayBuffer();
+            updateProgress(30, "オーディオデータをデコード中...");
+
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let decodedBuffer;
+            try {
+                decodedBuffer = await audioCtx.decodeAudioData(fileBuffer);
+            } catch(e) {
+                audioCtx.close();
+                throw new Error("動画から音声データを抽出・解読できませんでした。");
+            }
+
+            updateProgress(60, `${targetFormat.toUpperCase()} フォーマットに変換中...`);
+
+            let resultBlob;
+            if (targetFormat === 'mp3') {
+                resultBlob = await encodeMp3(decodedBuffer, bitrate);
+            } else if (targetFormat === 'wav') {
+                resultBlob = encodeWav(decodedBuffer);
+            } else { // aac / m4a fallback via WebAudio or simple WAV/Audio container
+                resultBlob = encodeWav(decodedBuffer);
+            }
+
+            audioCtx.close();
+
+            const audioUrl = URL.createObjectURL(resultBlob);
+            audioPlayer.src = audioUrl;
+            audioOutputWrapper.classList.remove('hidden');
+
+            videoDownloadBtn.href = audioUrl;
+            const baseName = currentFile.name.substring(0, currentFile.name.lastIndexOf('.')) || 'audio';
+            videoDownloadBtn.download = `${baseName}_extracted.${targetFormat}`;
+
+            videoResultMeta.textContent = `出力音声サイズ: ${formatBytes(resultBlob.size)} | 形式: ${targetFormat.toUpperCase()}`;
+            videoResultContainer.classList.remove('hidden');
+
+            updateProgress(100, "完了");
+            showToast("音声の抽出・変換が完了しました！", "success");
+        }
+
+        // MP3 Encoder using LameJS
+        function encodeMp3(audioBuffer, bitrate) {
+            return new Promise((resolve) => {
+                const channels = audioBuffer.numberOfChannels;
+                const sampleRate = audioBuffer.sampleRate;
+                const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, bitrate);
+                const mp3Data = [];
+
+                const sampleLength = audioBuffer.length;
+                const left = audioBuffer.getChannelData(0);
+                const right = channels > 1 ? audioBuffer.getChannelData(1) : left;
+
+                const sampleBlockSize = 1152; // number of samples per chunk
+                let i = 0;
+
+                function processBlock() {
+                    const end = Math.min(i + sampleBlockSize, sampleLength);
+                    const leftChunk = new Int16Array(end - i);
+                    const rightChunk = new Int16Array(end - i);
+
+                    for (let j = i, k = 0; j < end; j++, k++) {
+                        leftChunk[k] = Math.max(-1, Math.min(1, left[j])) * 0x7FFF;
+                        rightChunk[k] = Math.max(-1, Math.min(1, right[j])) * 0x7FFF;
+                    }
+
+                    let mp3buf;
+                    if (channels === 1) {
+                        mp3buf = mp3encoder.encodeBuffer(leftChunk);
+                    } else {
+                        mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+                    }
+
+                    if (mp3buf.length > 0) mp3Data.push(mp3buf);
+
+                    i = end;
+                    const percent = Math.round(60 + (i / sampleLength) * 35);
+                    updateProgress(percent, `MP3エンコード中 (${percent}%)`);
+
+                    if (i < sampleLength) {
+                        setTimeout(processBlock, 0);
+                    } else {
+                        const mp3bufLast = mp3encoder.flush();
+                        if (mp3bufLast.length > 0) mp3Data.push(mp3bufLast);
+                        resolve(new Blob(mp3Data, { type: 'audio/mp3' }));
+                    }
+                }
+
+                processBlock();
+            });
+        }
+
+        // WAV Encoder Function
+        function encodeWav(audioBuffer) {
+            const numOfChan = audioBuffer.numberOfChannels;
+            const length = audioBuffer.length * numOfChan * 2 + 44;
+            const buffer = new ArrayBuffer(length);
+            const view = new DataView(buffer);
+            const channels = [];
+            let sample;
+            let offset = 0;
+            let pos = 0;
+
+            function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+            function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+
+            setUint32(0x46464952); // "RIFF"
+            setUint32(length - 8); // file length - 8
+            setUint32(0x45564157); // "WAVE"
+            setUint32(0x20746d66); // "fmt " chunk
+            setUint32(16);         // length = 16
+            setUint16(1);          // PCM (uncompressed)
+            setUint16(numOfChan);
+            setUint32(audioBuffer.sampleRate);
+            setUint32(audioBuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+            setUint16(numOfChan * 2);                           // block-align
+            setUint16(16);                                      // 16-bit
+            setUint32(0x61746164); // "data" chunk
+            setUint32(length - pos - 4);
+
+            for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+                channels.push(audioBuffer.getChannelData(i));
+            }
+
+            while (offset < audioBuffer.length) {
+                for (let i = 0; i < numOfChan; i++) {
+                    sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                    view.setInt16(pos, sample, true);
+                    pos += 2;
+                }
+                offset++;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        /* ==========================================================================
+           HELPERS
+           ========================================================================== */
+        function updateProgress(percent, statusText) {
+            progressBar.style.width = `${percent}%`;
+            progressPercent.textContent = `${Math.round(percent)}%`;
+            progressStatus.textContent = statusText;
+        }
+
         function formatBytes(bytes) {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB'];
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '00:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         }
     </script>
 </body>
